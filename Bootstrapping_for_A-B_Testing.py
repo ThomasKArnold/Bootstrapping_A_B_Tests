@@ -27,9 +27,9 @@ import re
 
 def ttest(df, Group_A, Group_B):
     A_df = df.query("group == '" + Group_A + "'")
-    x = A_df['converted']
+    x = np.array(A_df['converted'])
     B_df = df.query("group == '" + Group_B + "'")
-    y = B_df['converted']
+    y = np.array(B_df['converted'])
 
     t_stat, p_val = ttest_ind(y, x)  
     # print("t-statistic = " + str(t_stat))  
