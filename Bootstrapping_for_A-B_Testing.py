@@ -257,9 +257,9 @@ elif dataset == 'SCJ':
 elif dataset == 'custom':
     experiment_name = 'Custom A/B/C Test)'
     data = [
-        ['A', 500, .002], 
-        ['B', 500, .0025], 
-        ['C', 500, .001]
+        ['A', 10000, .002], 
+        ['B', 10000, .0025], 
+        ['C', 10000, .001]
     ]
 
     n = 10000
