@@ -157,7 +157,7 @@ def create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, exp
     plot_output_file = plot_output_folder + experiment_name_text + '_' + pair_text + '.png' 
 
     # Save the plot to a file
-    plt.savefig(plot_output_file)
+    # plt.savefig(plot_output_file)
 
     # Show the plot
     plt.show()
@@ -324,7 +324,7 @@ print('Use {:.4f} as the maximum allowed value for p when interpreting the 95% p
 print('Use {:.5f} as the maximum allowed value for p when interpreting the 99% p-value (alpha = .01).'.format(bonferoni_alpha_99))
 print('Use {:.6f} as the maximum allowed value for p when interpreting the 99.9% p-value (alpha = .001).'.format(bonferoni_alpha_99_9))
 
-group_stats_df.to_clipboard()
+# group_stats_df.to_clipboard()
 print('Group stats are copied to clipboard')
 
 ###############################################################################################################
@@ -386,7 +386,7 @@ for i in range(number_of_tests):
 
 print(test_df)
 
-test_df.to_clipboard()
+# test_df.to_clipboard()
 print('Test stats are copied to clipboard')
 
 ###############################################################################################################
