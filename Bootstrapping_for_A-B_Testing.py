@@ -19,7 +19,7 @@ from scipy.stats import norm # For getting the p-values
 from scipy.stats import ttest_ind # For getting the t-statistics and p-values
 import re
 
-st.title('Bootstrapping for A/B Testing', anchor=None, *, help=None)
+st.title('Bootstrapping for A/B Testing', anchor=None, help=None)
 ###############################################################################################################
 # Step 2: Create Functions
 ###############################################################################################################
