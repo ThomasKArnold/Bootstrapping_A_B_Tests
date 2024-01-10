@@ -295,7 +295,7 @@ else:
     groups_df = pd.DataFrame(data = data, columns = columns)
     df = test_data_df(groups_df)
 
-df
+# df
 # df.info()
 
 ###############################################################################################################
