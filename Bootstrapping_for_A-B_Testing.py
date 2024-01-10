@@ -19,10 +19,20 @@ from scipy.stats import norm # For getting the p-values
 from scipy.stats import ttest_ind # For getting the t-statistics and p-values
 import re
 
-st.title('Bootstrapping for A/B Testing', anchor=None, help=None)
+print_environment = 'streamlit'
 ###############################################################################################################
 # Step 2: Create Functions
 ###############################################################################################################
+###############################################################################################################
+# Use print if local and streamlit if online
+def stream_print(print_environment, text_to_print, font_size):
+    if print_environment == 'streamlit':
+        if font_size == 'title':
+            st.title(text_to_print, anchor=None, help=None)
+        elif font_size == 'normal'
+            st.write(text_to_print)
+        
+stream_print(print_environment, 'Bootstrapping for A/B Testing', 'title')
 
 ###############################################################################################################
 # ttest: Get the t-statistics and p-values
@@ -276,7 +286,7 @@ elif dataset == 'custom':
 start_time = pd.Timestamp.now()
 
 # Print out the basic overview
-print('Results for', experiment_name)
+stream_print(print_environment, 'Results for' + experiment_name, 'normal')
 
 ###############################################################################################################
 # Step 4: Set up the dataframe
@@ -335,61 +345,63 @@ print('Group stats are copied to clipboard')
 
 ###############################################################################################################
 # Step 6: Get the test stats
+do_not_run = True
 
-test_df = pd.DataFrame(columns=['Test', 'Pair', 'Group_A', 'Group_B', 'A_N', 'B_N', 'A_CR', 'B_CR', 'A_STD', 'B_STD', 'Diff_B-A', 't', 'p', 't-Significance', 'Boostrap_Mean', 'Lower_95%_CI', 'Upper_95%_CI', 'Lower_99%_CI', 'Upper_99%_CI', 'Lower_99.9%_CI', 'Upper_9.9%_CI','Bootstrap_p', 'Bootstrap_Significance'])
-
-test_counter = 1
-for i in range(number_of_tests):
-    for j in range(i, number_of_variables-1):
-
-        Group_A = group_stats_df['Group_ID'][i]
-        A_N = group_stats_df['N'][i]
-        A_CR = group_stats_df['Conversion_Rate'][i]
-        A_STD = group_stats_df['STD'][i]
-        Group_B = group_stats_df['Group_ID'][j + 1]
-        B_N = group_stats_df['N'][j+1]
-        B_CR = group_stats_df['Conversion_Rate'][j+1]
-        B_STD = group_stats_df['STD'][j+1]
-        Diff_B_A = B_CR - A_CR
-        Pair = Group_A + '/' + Group_B
-
-        # Get the t and p values
-        t, p = ttest(df, Group_A, Group_B)
-
-        t_significance = significance_level(p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
-        
-        # Create the bootstrap sample data
-        differences = bootstrap_sample(df, n, Group_A, Group_B)
-        Bootstrap_Mean = differences.mean()
-        
-        # Create a null hypothesis distribution.
-        null_hypothesis = np.random.normal(0, differences.std(), differences.size)
-        len(null_hypothesis)
-        Null_Mean = null_hypothesis.mean()
-
-        # Plot the differences and null_hypothesis distributions.
-        create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, experiment_name, Pair, plot_output_folder)
-
-        # Create the confidence intervals
-        lower_95, upper_95 = confidence_interval(differences, bonferoni_alpha_95)
-        lower_99, upper_99 = confidence_interval(differences, bonferoni_alpha_99)
-        lower_99_9, upper_99_9 = confidence_interval(differences, bonferoni_alpha_99_9)
-
-        bootstrap_p = bootstrap_p_value(null_hypothesis, Bootstrap_Mean)
-
-        bootstrap_significance = significance_level(bootstrap_p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
-
-        # Put the stats in a list and add a row to the test output dataframe
-        column_data = [test_counter, Pair, Group_A, Group_B, A_N, B_N, A_CR, B_CR, A_STD, B_STD, Diff_B_A, t, p, t_significance, \
-                    Bootstrap_Mean, lower_95, upper_95, lower_99, upper_99, lower_99_9, upper_99_9, bootstrap_p, bootstrap_significance]
-        test_df.loc[len(test_df.index)] = column_data
-
-        test_counter = test_counter + 1
-
-print(test_df)
-
-# test_df.to_clipboard()
-print('Test stats are copied to clipboard')
+if do_not_run == False:
+    test_df = pd.DataFrame(columns=['Test', 'Pair', 'Group_A', 'Group_B', 'A_N', 'B_N', 'A_CR', 'B_CR', 'A_STD', 'B_STD', 'Diff_B-A', 't', 'p', 't-Significance', 'Boostrap_Mean', 'Lower_95%_CI', 'Upper_95%_CI', 'Lower_99%_CI', 'Upper_99%_CI', 'Lower_99.9%_CI', 'Upper_9.9%_CI','Bootstrap_p', 'Bootstrap_Significance'])
+    
+    test_counter = 1
+    for i in range(number_of_tests):
+        for j in range(i, number_of_variables-1):
+    
+            Group_A = group_stats_df['Group_ID'][i]
+            A_N = group_stats_df['N'][i]
+            A_CR = group_stats_df['Conversion_Rate'][i]
+            A_STD = group_stats_df['STD'][i]
+            Group_B = group_stats_df['Group_ID'][j + 1]
+            B_N = group_stats_df['N'][j+1]
+            B_CR = group_stats_df['Conversion_Rate'][j+1]
+            B_STD = group_stats_df['STD'][j+1]
+            Diff_B_A = B_CR - A_CR
+            Pair = Group_A + '/' + Group_B
+    
+            # Get the t and p values
+            t, p = ttest(df, Group_A, Group_B)
+    
+            t_significance = significance_level(p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
+            
+            # Create the bootstrap sample data
+            differences = bootstrap_sample(df, n, Group_A, Group_B)
+            Bootstrap_Mean = differences.mean()
+            
+            # Create a null hypothesis distribution.
+            null_hypothesis = np.random.normal(0, differences.std(), differences.size)
+            len(null_hypothesis)
+            Null_Mean = null_hypothesis.mean()
+    
+            # Plot the differences and null_hypothesis distributions.
+            create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, experiment_name, Pair, plot_output_folder)
+    
+            # Create the confidence intervals
+            lower_95, upper_95 = confidence_interval(differences, bonferoni_alpha_95)
+            lower_99, upper_99 = confidence_interval(differences, bonferoni_alpha_99)
+            lower_99_9, upper_99_9 = confidence_interval(differences, bonferoni_alpha_99_9)
+    
+            bootstrap_p = bootstrap_p_value(null_hypothesis, Bootstrap_Mean)
+    
+            bootstrap_significance = significance_level(bootstrap_p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
+    
+            # Put the stats in a list and add a row to the test output dataframe
+            column_data = [test_counter, Pair, Group_A, Group_B, A_N, B_N, A_CR, B_CR, A_STD, B_STD, Diff_B_A, t, p, t_significance, \
+                        Bootstrap_Mean, lower_95, upper_95, lower_99, upper_99, lower_99_9, upper_99_9, bootstrap_p, bootstrap_significance]
+            test_df.loc[len(test_df.index)] = column_data
+    
+            test_counter = test_counter + 1
+    
+    print(test_df)
+    
+    # test_df.to_clipboard()
+    print('Test stats are copied to clipboard')
 
 ###############################################################################################################
 # Show the time to run
