@@ -29,7 +29,7 @@ def stream_print(print_environment, text_to_print, font_size):
     if print_environment == 'streamlit':
         if font_size == 'title':
             st.title(text_to_print, anchor=None, help=None)
-        elif font_size == 'normal'
+        elif font_size == 'normal':
             st.write(text_to_print)
         
 stream_print(print_environment, 'Bootstrapping for A/B Testing', 'title')
