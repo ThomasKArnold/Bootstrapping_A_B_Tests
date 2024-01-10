@@ -11,6 +11,7 @@
 ###############################################################################################################
 # Step1: Load required packages
 
+import streamlit as st
 import pandas as pd # For data manipulations
 import numpy as np # For numerical calculations
 from matplotlib import pyplot as plt # For plotting the distributions
@@ -18,6 +19,7 @@ from scipy.stats import norm # For getting the p-values
 from scipy.stats import ttest_ind # For getting the t-statistics and p-values
 import re
 
+st.title('Bootstrapping for A/B Testing', anchor=None, *, help=None)
 ###############################################################################################################
 # Step 2: Create Functions
 ###############################################################################################################
