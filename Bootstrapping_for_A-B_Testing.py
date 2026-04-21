@@ -1,5 +1,5 @@
 ###############################################################################################################
-# The Lacek Bootstrapping for A/B Testing Python Code
+# The Bootstrapping for A/B Testing Python Code
 # An A/B bootstrapping program for testing results from advertising campaigns
 ###############################################################################################################
 
@@ -7,6 +7,12 @@
 # References: The initial code was taken from the following web pages
 # https://baotramduong.medium.com/data-science-project-a-b-testing-for-ad-campaign-in-python-ffaca9170bc4
 # https://www.datatipz.com/blog/hypothesis-testing-with-bootstrapping-python
+
+"""
+cd /home/tom/Python/Bootstrapping
+source .venv/bin/activate
+streamlit run Bootstrapping_for_A-B_Testing.py
+"""
 
 ###############################################################################################################
 # Step1: Load required packages
@@ -18,6 +24,7 @@ from matplotlib import pyplot as plt # For plotting the distributions
 from scipy.stats import norm # For getting the p-values
 from scipy.stats import ttest_ind # For getting the t-statistics and p-values
 import re
+import os
 
 print_environment = 'streamlit'
 ###############################################################################################################
@@ -103,28 +110,49 @@ def test_data_df(groups_df):
 
 ###############################################################################################################
 # Create a bootstrap sample with n records of the differences in sample means between Group_A and Group_B samples
-def bootstrap_sample(df, n, Group_A, Group_B):
+def bootstrap_sample(df, n, Group_A, Group_B, large_dataset_threshold=50000, large_dataset_sample_size=10000):
 
-    # Bootsrapping
+    # Bootstrapping
     A_df = df.query("group == '" + Group_A + "'")
     B_df = df.query("group == '" + Group_B + "'")
+    print(f'  Bootstrap: Group {Group_A} has {len(A_df):,} rows, Group {Group_B} has {len(B_df):,} rows')
+
+    # For large datasets, sample a fixed number of rows per iteration instead of
+    # resampling the full group, which would be extremely slow.
+    A_sample_size = len(A_df)
+    B_sample_size = len(B_df)
+
+    if len(A_df) > large_dataset_threshold:
+        A_sample_size = large_dataset_sample_size
+        print(f'  Group {Group_A} is large ({len(A_df):,} rows). Capping each bootstrap resample to {large_dataset_sample_size:,} rows.')
+    if len(B_df) > large_dataset_threshold:
+        B_sample_size = large_dataset_sample_size
+        print(f'  Group {Group_B} is large ({len(B_df):,} rows). Capping each bootstrap resample to {large_dataset_sample_size:,} rows.')
+
+    print(f'  Starting {n:,} bootstrap iterations...')
+
     # Create a blank list to hold the sample differences
     differences = []
     # Create n bootstrap samples (note that n was set in the settings above)
     for i in range(n):
-        # Create a sample dataframe with replacement from group A 
-        A_sample_df = A_df.sample(len(A_df), replace=True)
+        # Print progress every 10%
+        if i % (n // 10) == 0:
+            print(f'  Bootstrap progress: {i}/{n} ({int(i/n*100)}%)')
+
+        # Create a sample dataframe with replacement from group A
+        A_sample_df = A_df.sample(A_sample_size, replace=True)
         # Compute the conversion rate for the group A sample
         A_sample_cr = A_sample_df['converted'].mean()
 
         # Create a sample dataframe with replacement from group B
-        B_sample_df = B_df.sample(len(B_df), replace=True)
+        B_sample_df = B_df.sample(B_sample_size, replace=True)
         # Compute the conversion rate for the group B sample
         B_sample_cr = B_sample_df['converted'].mean()
 
         # Add the difference between the conversion rates for groups A and B to the differences list
         differences.append(B_sample_cr - A_sample_cr)
 
+    print(f'  Bootstrap complete: {n}/{n} (100%)')
     differences = np.array(differences)
 
     return differences
@@ -132,47 +160,50 @@ def bootstrap_sample(df, n, Group_A, Group_B):
 ###############################################################################################################
 # Plot the sampling distribution and null hypothesis
 def create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, experiment_name, Pair, plot_output_folder):
-    plt.figure(figsize=(12, 8))
+    # Use an explicit Figure object so st.pyplot() renders correctly in Streamlit
+    fig, ax = plt.subplots(figsize=(12, 8))
 
-    plt.hist(differences,  
-            alpha=0.5, # the transaparency parameter 
+    ax.hist(differences,
+            alpha=0.5,  # the transparency parameter
             color='blue',
             bins=25,
-            label='Sample Differences') 
+            label='Sample Differences')
 
-    plt.axvline(Bootstrap_Mean, 
-                c='blue',
-                label='Bootstrap Mean')
-    
-    plt.hist(null_hypothesis, 
-            alpha=0.5, 
+    ax.axvline(Bootstrap_Mean,
+               c='blue',
+               label='Bootstrap Mean')
+
+    ax.hist(null_hypothesis,
+            alpha=0.5,
             color='red',
             bins=25,
-            label='Null Hypothesis') 
+            label='Null Hypothesis')
 
-    plt.axvline(Null_Mean, 
-                c='red',
-                label='Null Mean')
+    ax.axvline(Null_Mean,
+               c='red',
+               label='Null Mean')
 
-    plt.legend(loc='upper right') 
+    ax.legend(loc='upper right')
 
     plot_title = experiment_name + ' (' + Pair + ' Group Pair)'
+    ax.set_title(plot_title)
+    ax.set_xlabel("Difference")
+    ax.set_ylabel("Frequency")
 
-    plt.title(plot_title)
-    plt.xlabel("Difference")
-    plt.ylabel("Frequency")
-
-    experiment_name_text = re.sub(r'[\\/*?:"<>|]',"_", experiment_name)
-    pair_text = 'groups_' + re.sub(r'[\\/*?:"<>|]',"_", Pair)
-    plot_output_file = experiment_name_text + '_' + pair_text + '.png' 
+    experiment_name_text = re.sub(r'[\\/*?:"<>|]', "_", experiment_name)
+    pair_text = 'groups_' + re.sub(r'[\\/*?:"<>|]', "_", Pair)
+    plot_output_file = plot_output_folder + experiment_name_text + '_' + pair_text + '.png'
     plot_output_file = plot_output_file.replace(" ", "_")
-    plot_output_file = plot_output_folder + experiment_name_text + '_' + pair_text + '.png' 
 
-    # Save the plot to a file
-    # plt.savefig(plot_output_file)
+    # Save the plot to a file — create output folder if it doesn't exist
+    os.makedirs(plot_output_folder, exist_ok=True)
+    fig.savefig(plot_output_file)
 
-    # Show the plot
-    plt.show()
+    # Display the plot in the Streamlit browser
+    st.pyplot(fig)
+    plt.close(fig)  # Free memory after displaying
+
+    return plot_output_file
 
 ###############################################################################################################
 # Get the confidence interval for the bootstrap sample
@@ -224,194 +255,313 @@ def significance_level(p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alph
 print('Ready to run code')
 
 ###############################################################################################################
-# Step 3: Set up the environment
+# Step 3: Set up the environment via Streamlit sidebar inputs
 
-# dataset = 'Ford'
-# dataset = 'SCJ'
-dataset = 'custom'
+st.sidebar.header('Configuration')
 
-# Code works with txt or csv files.
-# Code assumes three input columns for user id, group name, and conversion measures.
-# Code converts your column names to standard column names.
+# Auto-detect the folder where this script lives, then build default data/output paths from it.
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
-if dataset == 'Ford':
-    experiment_name = 'The Ford A/B/C Test (12-28-2023)'
-    input_folder = 'Q://TLG/General/Data Solutions/Measure AB Test/'
-    input_file_name = 'LARV_Q1_cardholder_test_data_122823.txt'
-    text_delimiter = '|'
+st.sidebar.subheader('Program Location')
+base_folder = st.sidebar.text_input(
+    'Main Program Folder',
+    value=script_dir,
+    help='Auto-detected from script location. Edit if needed.'
+)
+# Ensure base_folder ends with a separator
+base_folder = base_folder.rstrip('/\\') + '/'
 
-    # Input column names
-    id_column_name = 'consumer_id'
-    group_indicator_column_name = 'version'
-    conversion_indicator_column_name = 'card_yes'
+# Dataset type selector
+dataset = st.sidebar.radio(
+    'Dataset Type',
+    options=['custom', 'file'],
+    format_func=lambda x: 'Custom (synthetic data)' if x == 'custom' else 'File (CSV or TXT)'
+)
 
-    n = 10000
+plot_title_base = 'Distributions of the Sample Differences vs the Null Hypothesis'
 
-    # The plot of the distribution of sample differences vs the plot of the null hypothesis plot will have the following title base
-    plot_title_base = 'Distributions of the Sample Differences vs the Null Hypothesis'
-    plot_output_folder = 'Q://TLG/General/Data Solutions/Measure AB Test/output/'
-elif dataset == 'SCJ':
-    experiment_name = 'SCJ Income Test'
-    input_folder = 'Q://TLG/General/Data Solutions/Measure AB Test/'
-    input_file_name = 'Income_Sample.csv'
-    text_delimiter = ','
+if dataset == 'file':
+    st.sidebar.subheader('Experiment Settings')
+    experiment_name = st.sidebar.text_input('Experiment Name', value='My A/B Test')
 
-    # Input column names
-    id_column_name = 'Guid'
-    group_indicator_column_name = 'YearMonth'
-    conversion_indicator_column_name = 'total_excluding_tax'
+    # Accept relative (e.g. "data") or absolute paths for data and output folders
+    data_folder_input = st.sidebar.text_input(
+        'Data Folder',
+        value='data',
+        help='Relative to main program folder (e.g. "data"), or enter a full path.'
+    )
+    input_folder = data_folder_input if os.path.isabs(data_folder_input) else os.path.join(base_folder, data_folder_input) + '/'
 
-    n = 10000
+    input_file_name = st.sidebar.text_input('Input File Name', value='marketing_AB.csv')
+    text_delimiter = st.sidebar.selectbox('Delimiter', options=[',', '|', '	'], format_func=lambda x: {',': 'Comma (CSV)', '|': 'Pipe (TXT)', '	': 'Tab'}.get(x, x))
 
-    # The plot of the distribution of sample differences vs the plot of the null hypothesis plot will have the following title base
-    plot_title_base = 'Distributions of the Sample Differences vs the Null Hypothesis'
-    plot_output_folder = 'Q://TLG/General/Data Solutions/Measure AB Test/output/'
-elif dataset == 'custom':
-    experiment_name = 'Custom A/B/C Test)'
-    data = [
-        ['A', 10000, .002], 
-        ['B', 10000, .0025], 
-        ['C', 10000, .001]
-    ]
+    output_folder_input = st.sidebar.text_input(
+        'Output Folder',
+        value='output',
+        help='Relative to main program folder (e.g. "output"), or enter a full path.'
+    )
+    plot_output_folder = output_folder_input if os.path.isabs(output_folder_input) else os.path.join(base_folder, output_folder_input) + '/'
 
-    n = 10000
+    st.sidebar.caption(f'Data: {input_folder}')
+    st.sidebar.caption(f'Output: {plot_output_folder}')
 
-    plot_title_base = 'Distributions of the Sample Differences vs the Null Hypothesis'
-    plot_output_folder = 'Q://TLG/General/Data Solutions/Measure AB Test/output/'
+    st.sidebar.subheader('Column Names in Your File')
+    id_column_name = st.sidebar.text_input('ID Column', value='user id')
+    group_indicator_column_name = st.sidebar.text_input('Group Column', value='test group')
+    conversion_indicator_column_name = st.sidebar.text_input('Conversion Column', value='converted')
+
+    n = st.sidebar.number_input('Bootstrap Iterations (n)', min_value=100, max_value=50000, value=10000, step=500)
+
+else:  # custom
+    st.sidebar.subheader('Custom Synthetic Data')
+    experiment_name = st.sidebar.text_input('Experiment Name', value='Custom A/B/C Test')
+
+    output_folder_input = st.sidebar.text_input(
+        'Output Folder',
+        value='output',
+        help='Relative to main program folder (e.g. "output"), or enter a full path.'
+    )
+    plot_output_folder = output_folder_input if os.path.isabs(output_folder_input) else os.path.join(base_folder, output_folder_input) + '/'
+
+    st.sidebar.caption(f'Output: {plot_output_folder}')
+
+    n = st.sidebar.number_input('Bootstrap Iterations (n)', min_value=100, max_value=50000, value=10000, step=500)
+
+    st.sidebar.markdown('**Groups** — enter one per line as: `GroupName, SampleSize, ConversionRate`')
+    custom_groups_text = st.sidebar.text_area(
+        'Group Definitions',
+        value='A, 10000, 0.002\nB, 10000, 0.0025\nC, 10000, 0.001'
+    )
+
+    # Parse the custom group definitions
+    data = []
+    for line in custom_groups_text.strip().split('\n'):
+        parts = [p.strip() for p in line.split(',')]
+        if len(parts) == 3:
+            try:
+                data.append([parts[0], int(parts[1]), float(parts[2])])
+            except ValueError:
+                st.sidebar.error(f'Could not parse line: {line}')
+
+run_analysis = st.sidebar.button('▶ Run Analysis', type='primary')
+
 
 ###############################################################################################################
-# Step 3a: Housekeeping - No input required
+# Step 3a: Run analysis when button is clicked
 
-# Start time is set by the program.  No need to edit.
-start_time = pd.Timestamp.now()
-
-# Print out the basic overview
-stream_print(print_environment, 'Results for' + experiment_name, 'normal')
-
-###############################################################################################################
-# Step 4: Set up the dataframe
-
-if dataset != 'custom':
-    # Put the data into a dataframe.
-    # Code works for txt or csv input files, add new type if needed.
-    if input_file_name[-3:] == 'txt':
-        df = pd.read_table(input_folder + input_file_name, sep=text_delimiter, header='infer')
-    elif input_file_name[-3:] == 'csv':
-        df = pd.read_csv(input_folder + input_file_name, sep=text_delimiter, header='infer') 
-
-    # Change the data column names to a standard format with “group” and “converted” columns
-    df = df.rename(columns={id_column_name : 'id', group_indicator_column_name : 'group', conversion_indicator_column_name : 'converted'})
-    df['group'] = df['group'].apply(str)
+if not run_analysis:
+    st.info('👈 Configure your settings in the sidebar, then click **Run Analysis** to begin.')
 else:
-    columns=['group', 'n', 'p']
-    groups_df = pd.DataFrame(data = data, columns = columns)
-    df = test_data_df(groups_df)
+    # Start time is set by the program.  No need to edit.
+    start_time = pd.Timestamp.now()
 
-# df
-# df.info()
+    # Print out the basic overview
+    stream_print(print_environment, 'Results for ' + experiment_name, 'normal')
 
-###############################################################################################################
-# Step 5: Get the group stats
+    ###############################################################################################################
+    # Step 4: Set up the dataframe
 
-group_stats_df = df.groupby('group') \
-    .agg({'id':'size', 'converted': ('mean', 'std')}) \
-    .reset_index() 
- 
-group_stats_df.columns = ['Group_ID','N','Conversion_Rate','STD']
-print(group_stats_df)
+    status = st.status('Loading data...', expanded=True)
 
-# Number of variables to be tested.
-number_of_variables =  group_stats_df.shape[0]
-print('Number of Variables:',number_of_variables)
-number_of_tests = int((number_of_variables * (number_of_variables - 1)) / 2)
-print('Number of Tests:', number_of_tests)
+    if dataset != 'custom':
+        status.write(f'📂 Reading file: {input_folder + input_file_name}')
+        if input_file_name[-3:] == 'txt':
+            df = pd.read_table(input_folder + input_file_name, sep=text_delimiter, header='infer')
+        elif input_file_name[-3:] == 'csv':
+            df = pd.read_csv(input_folder + input_file_name, sep=text_delimiter, header='infer')
 
-# Calculate the bonferoni alpha for each confidence level
-bonferoni_alpha_95 = .05 / number_of_tests
-bonferoni_alpha_99 = .01 / number_of_tests
-bonferoni_alpha_99_9 = .001 / number_of_tests
+        # Change the data column names to a standard format with "group" and "converted" columns
+        df = df.rename(columns={id_column_name : 'id', group_indicator_column_name : 'group', conversion_indicator_column_name : 'converted'})
+        df['group'] = df['group'].apply(str)
+        status.write(f'✅ Loaded {len(df):,} rows.')
+    else:
+        status.write('🔧 Generating synthetic data...')
+        columns = ['group', 'n', 'p']
+        groups_df = pd.DataFrame(data=data, columns=columns)
+        df = test_data_df(groups_df)
+        status.write(f'✅ Generated {len(df):,} rows.')
 
-# Print out the Bonferoni apha
-print('Use {:.4f} as the maximum allowed value for p when interpreting the 95% p-value (alpha = .05).'.format(bonferoni_alpha_95))
-print('Use {:.5f} as the maximum allowed value for p when interpreting the 99% p-value (alpha = .01).'.format(bonferoni_alpha_99))
-print('Use {:.6f} as the maximum allowed value for p when interpreting the 99.9% p-value (alpha = .001).'.format(bonferoni_alpha_99_9))
+    ###############################################################################################################
+    # Step 5: Get the group stats
 
-# group_stats_df.to_clipboard()
-print('Group stats are copied to clipboard')
+    status.write('📊 Computing group statistics...')
 
-###############################################################################################################
-# STOP HERE to get the group stats for output
-###############################################################################################################
+    group_stats_df = df.groupby('group') \
+        .agg({'id':'size', 'converted': ('mean', 'std')}) \
+        .reset_index()
 
-###############################################################################################################
-# Step 6: Get the test stats
-do_not_run = True
+    group_stats_df.columns = ['Group_ID','N','Conversion_Rate','STD']
+    print(group_stats_df)
 
-if do_not_run == False:
-    test_df = pd.DataFrame(columns=['Test', 'Pair', 'Group_A', 'Group_B', 'A_N', 'B_N', 'A_CR', 'B_CR', 'A_STD', 'B_STD', 'Diff_B-A', 't', 'p', 't-Significance', 'Boostrap_Mean', 'Lower_95%_CI', 'Upper_95%_CI', 'Lower_99%_CI', 'Upper_99%_CI', 'Lower_99.9%_CI', 'Upper_9.9%_CI','Bootstrap_p', 'Bootstrap_Significance'])
-    
+    # Number of variables to be tested.
+    number_of_variables = group_stats_df.shape[0]
+    number_of_tests = int((number_of_variables * (number_of_variables - 1)) / 2)
+
+    # Calculate the bonferoni alpha for each confidence level
+    bonferoni_alpha_95   = .05  / number_of_tests
+    bonferoni_alpha_99   = .01  / number_of_tests
+    bonferoni_alpha_99_9 = .001 / number_of_tests
+
+    print('Number of Variables:', number_of_variables)
+    print('Number of Tests:', number_of_tests)
+    print('Use {:.4f} as the maximum allowed value for p when interpreting the 95% p-value (alpha = .05).'.format(bonferoni_alpha_95))
+    print('Use {:.5f} as the maximum allowed value for p when interpreting the 99% p-value (alpha = .01).'.format(bonferoni_alpha_99))
+    print('Use {:.6f} as the maximum allowed value for p when interpreting the 99.9% p-value (alpha = .001).'.format(bonferoni_alpha_99_9))
+
+    status.update(label='✅ Data loaded and group stats ready.', state='complete', expanded=False)
+
+    # Display group stats in Streamlit browser
+    st.subheader('Group Statistics')
+    st.dataframe(group_stats_df)
+    st.write(f'Number of Variables: {number_of_variables} | Number of Tests: {number_of_tests}')
+    st.write(f'Bonferroni-adjusted alpha — 95%: {bonferoni_alpha_95:.4f} | 99%: {bonferoni_alpha_99:.5f} | 99.9%: {bonferoni_alpha_99_9:.6f}')
+
+    ###############################################################################################################
+    # Step 6: Get the test stats
+
+    st.subheader('Bootstrap Test Results')
+
+    test_df = pd.DataFrame(columns=['Test', 'Pair', 'Group_A', 'Group_B', 'A_N', 'B_N', 'A_CR', 'B_CR', 'A_STD', 'B_STD', 'Diff_B-A', 't', 'p', 't-Significance', 'Boostrap_Mean', 'Lower_95%_CI', 'Upper_95%_CI', 'Lower_99%_CI', 'Upper_99%_CI', 'Lower_99.9%_CI', 'Upper_9.9%_CI', 'Bootstrap_p', 'Bootstrap_Significance'])
+
+    plot_paths = []  # Track saved plot file paths
+    total_tests = number_of_tests
+    overall_progress = st.progress(0, text='Overall progress: 0 of {} tests'.format(total_tests))
     test_counter = 1
+
     for i in range(number_of_tests):
-        for j in range(i, number_of_variables-1):
-    
-            Group_A = group_stats_df['Group_ID'][i]
-            A_N = group_stats_df['N'][i]
-            A_CR = group_stats_df['Conversion_Rate'][i]
-            A_STD = group_stats_df['STD'][i]
-            Group_B = group_stats_df['Group_ID'][j + 1]
-            B_N = group_stats_df['N'][j+1]
-            B_CR = group_stats_df['Conversion_Rate'][j+1]
-            B_STD = group_stats_df['STD'][j+1]
+        for j in range(i, number_of_variables - 1):
+
+            Group_A  = group_stats_df['Group_ID'][i]
+            A_N      = group_stats_df['N'][i]
+            A_CR     = group_stats_df['Conversion_Rate'][i]
+            A_STD    = group_stats_df['STD'][i]
+            Group_B  = group_stats_df['Group_ID'][j + 1]
+            B_N      = group_stats_df['N'][j + 1]
+            B_CR     = group_stats_df['Conversion_Rate'][j + 1]
+            B_STD    = group_stats_df['STD'][j + 1]
             Diff_B_A = B_CR - A_CR
-            Pair = Group_A + '/' + Group_B
-    
-            # Get the t and p values
-            t, p = ttest(df, Group_A, Group_B)
-    
-            t_significance = significance_level(p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
-            
-            # Create the bootstrap sample data
-            differences = bootstrap_sample(df, n, Group_A, Group_B)
-            Bootstrap_Mean = differences.mean()
-            
-            # Create a null hypothesis distribution.
-            null_hypothesis = np.random.normal(0, differences.std(), differences.size)
-            len(null_hypothesis)
-            Null_Mean = null_hypothesis.mean()
-    
-            # Plot the differences and null_hypothesis distributions.
-            create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, experiment_name, Pair, plot_output_folder)
-    
-            # Create the confidence intervals
-            lower_95, upper_95 = confidence_interval(differences, bonferoni_alpha_95)
-            lower_99, upper_99 = confidence_interval(differences, bonferoni_alpha_99)
-            lower_99_9, upper_99_9 = confidence_interval(differences, bonferoni_alpha_99_9)
-    
-            bootstrap_p = bootstrap_p_value(null_hypothesis, Bootstrap_Mean)
-    
-            bootstrap_significance = significance_level(bootstrap_p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
-    
-            # Put the stats in a list and add a row to the test output dataframe
-            column_data = [test_counter, Pair, Group_A, Group_B, A_N, B_N, A_CR, B_CR, A_STD, B_STD, Diff_B_A, t, p, t_significance, \
-                        Bootstrap_Mean, lower_95, upper_95, lower_99, upper_99, lower_99_9, upper_99_9, bootstrap_p, bootstrap_significance]
+            Pair     = Group_A + '/' + Group_B
+
+            print(f'\n--- Test {test_counter}: Pair {Pair} ---')
+
+            with st.status(f'Test {test_counter}/{total_tests}: {Pair}', expanded=True) as test_status:
+
+                # t-test
+                st.write('Running t-test...')
+                print('  Running t-test...')
+                t, p = ttest(df, Group_A, Group_B)
+                print(f'  t-test complete: t={t:.4f}, p={p:.6f}')
+                st.write(f'✅ t-test complete — t={t:.4f}, p={p:.6f}')
+
+                t_significance = significance_level(p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
+
+                # Bootstrap with inline browser progress bar
+                n_int = int(n)
+                st.write(f'Running {n_int:,} bootstrap iterations...')
+                print('  Running bootstrap sample (this may take a while for large datasets)...')
+                bootstrap_progress = st.progress(0, text='Bootstrap: 0%')
+
+                A_df = df.query("group == '" + Group_A + "'")
+                B_df = df.query("group == '" + Group_B + "'")
+
+                large_dataset_threshold  = 50000
+                large_dataset_sample_size = 10000
+                A_sample_size = min(len(A_df), large_dataset_sample_size) if len(A_df) > large_dataset_threshold else len(A_df)
+                B_sample_size = min(len(B_df), large_dataset_sample_size) if len(B_df) > large_dataset_threshold else len(B_df)
+
+                if len(A_df) > large_dataset_threshold:
+                    st.write(f'ℹ️ Group {Group_A} is large ({len(A_df):,} rows) — capping resample to {large_dataset_sample_size:,} rows per iteration.')
+                    print(f'  Group {Group_A} is large ({len(A_df):,} rows). Capping each bootstrap resample to {large_dataset_sample_size:,} rows.')
+                if len(B_df) > large_dataset_threshold:
+                    st.write(f'ℹ️ Group {Group_B} is large ({len(B_df):,} rows) — capping resample to {large_dataset_sample_size:,} rows per iteration.')
+                    print(f'  Group {Group_B} is large ({len(B_df):,} rows). Capping each bootstrap resample to {large_dataset_sample_size:,} rows.')
+
+                differences = []
+                for k in range(n_int):
+                    if k % (n_int // 10) == 0:
+                        pct = int(k / n_int * 100)
+                        bootstrap_progress.progress(k / n_int, text=f'Bootstrap: {pct}% ({k:,}/{n_int:,})')
+                        print(f'  Bootstrap progress: {k}/{n_int} ({pct}%)')
+                    A_sample_cr = A_df.sample(A_sample_size, replace=True)['converted'].mean()
+                    B_sample_cr = B_df.sample(B_sample_size, replace=True)['converted'].mean()
+                    differences.append(B_sample_cr - A_sample_cr)
+
+                bootstrap_progress.progress(1.0, text='Bootstrap: 100% complete')
+                print(f'  Bootstrap complete: {n_int}/{n_int} (100%)')
+                differences   = np.array(differences)
+                Bootstrap_Mean = differences.mean()
+                print(f'  Bootstrap mean: {Bootstrap_Mean:.6f}')
+                st.write(f'✅ Bootstrap complete — Mean difference: {Bootstrap_Mean:.6f}')
+
+                # Null hypothesis distribution
+                st.write('Creating null hypothesis distribution...')
+                null_hypothesis = np.random.normal(0, differences.std(), differences.size)
+                Null_Mean = null_hypothesis.mean()
+                print(f'  Null mean: {Null_Mean:.6f}')
+
+                # Confidence intervals
+                lower_95,   upper_95   = confidence_interval(differences, bonferoni_alpha_95)
+                lower_99,   upper_99   = confidence_interval(differences, bonferoni_alpha_99)
+                lower_99_9, upper_99_9 = confidence_interval(differences, bonferoni_alpha_99_9)
+
+                bootstrap_p            = bootstrap_p_value(null_hypothesis, Bootstrap_Mean)
+                bootstrap_significance = significance_level(bootstrap_p, bonferoni_alpha_95, bonferoni_alpha_99, bonferoni_alpha_99_9)
+
+                test_status.update(label=f'✅ Test {test_counter}/{total_tests}: {Pair} complete', state='complete', expanded=False)
+
+            # Plot is rendered outside the st.status block so it stays visible after the block collapses
+            st.subheader(f'Plot: {Pair}')
+            print('  Creating plot...')
+            plot_path = create_the_plot(differences, null_hypothesis, Bootstrap_Mean, Null_Mean, experiment_name, Pair, plot_output_folder)
+            plot_paths.append(plot_path)
+            print(f'  Plot saved: {plot_path}')
+
+            # Results summary block under each plot
+            st.markdown(
+                f"""
+| Test | Statistic | p-value | Significance |
+|---|---|---|---|
+| Regular t-test | t = {t:.5f} | {p:.6f} | {t_significance if t_significance else '(not significant)'} |
+| Bootstrap test | Mean diff = {Bootstrap_Mean:.5f} | {bootstrap_p:.6f} | {bootstrap_significance if bootstrap_significance else '(not significant)'} |
+"""
+            )
+
+            # Add row to results dataframe
+            column_data = [test_counter, Pair, Group_A, Group_B, A_N, B_N, A_CR, B_CR, A_STD, B_STD, Diff_B_A,
+                           t, p, t_significance, Bootstrap_Mean, lower_95, upper_95, lower_99, upper_99,
+                           lower_99_9, upper_99_9, bootstrap_p, bootstrap_significance]
             test_df.loc[len(test_df.index)] = column_data
-    
-            test_counter = test_counter + 1
-    
+
+            overall_progress.progress(test_counter / total_tests,
+                                       text=f'Overall progress: {test_counter} of {total_tests} tests')
+            test_counter += 1
+
     print(test_df)
-    
-    # test_df.to_clipboard()
-    print('Test stats are copied to clipboard')
+
+    # Display final results table in browser
+    st.subheader('Test Results')
+    st.dataframe(test_df)
+
+    # Save results CSV to output folder
+    os.makedirs(plot_output_folder, exist_ok=True)
+    experiment_name_text = re.sub(r'[\/*?:"<>|]', "_", experiment_name).replace(" ", "_")
+    csv_path = plot_output_folder + experiment_name_text + '_results.csv'
+    test_df.to_csv(csv_path, index=False)
+    print(f'Results saved to: {csv_path}')
+
+    ###############################################################################################################
+    # Show the time to run
+    end_time = pd.Timestamp.now()
+    minutes_elapsed = (end_time - start_time)
+    print('Finished parsing in ' + str(minutes_elapsed))
+    st.success(f'✅ Analysis complete — finished in {minutes_elapsed}')
+
+    # Print summary of all saved files
+    st.subheader('📁 Saved Output Files')
+    st.write(f'**Results CSV:** {csv_path}')
+    for path in plot_paths:
+        st.write(f'**Plot:** {path}')
 
 ###############################################################################################################
-# Show the time to run
-end_time = pd.Timestamp.now()
-minutes_elapsed = (end_time - start_time)
-print('Finished parsing in ' + str(minutes_elapsed))
-
+# The test stats are displayed above and can be copied from the browser table
 ###############################################################################################################
-# The test stats are in the clipboard and can be pasted to Excel
-###############################################################################################################
-
-
-
