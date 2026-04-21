@@ -1,6 +1,6 @@
 ###############################################################################################################
 # The Lacek Bootstrapping for A/B Testing Python Code
-# An A/B bootstrapping program dor testing results from advertising campaigns
+# An A/B bootstrapping program for testing results from advertising campaigns
 ###############################################################################################################
 
 ###############################################################################################################
