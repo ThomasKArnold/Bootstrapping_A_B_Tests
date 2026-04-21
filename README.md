@@ -221,6 +221,11 @@ The browser displays the full file paths at the end of the run.
 Explorations in Science
 arnoldtk@mail.uc.edu
 
+## How to Cite
+If you use this software in your research or work, please cite it as:
+
+Arnold, T. K. (2026, April). *Bootstrapping for A/B Testing* [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.19683408
+
 ---
 ## License
 
